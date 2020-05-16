@@ -1,12 +1,10 @@
 import numpy as np
 import tensorflow as tf
-from keras.layers import (
-    BatchNormalization, Conv2D, Input, Lambda,
-    MaxPooling2D, Reshape, Softmax
+from tensorflow.keras.layers import (
+    BatchNormalization, concatenate, Conv2D, Input, Lambda,
+    LeakyReLU, MaxPooling2D, Reshape, Softmax,
 )
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.merge import concatenate
-from keras.models import Model
+from tensorflow.keras.models import Model
 
 
 def tile_outputs(output, max_boxes):

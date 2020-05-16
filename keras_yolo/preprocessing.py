@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import cv2
 import numpy as np
 from imgaug import augmenters as iaa
-from keras.utils import Sequence
+from tensorflow.keras.utils import Sequence
 from skimage.transform import resize
 
 from keras_yolo.model import Yolo
