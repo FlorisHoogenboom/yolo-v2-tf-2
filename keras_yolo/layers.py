@@ -14,9 +14,9 @@ class YoloConvLayer(Model):
         self.norm = BatchNormalization()
         self.activation = LeakyReLU(alpha=0.1)
 
-    def call(self, x):
+    def call(self, x, training=False):
         x = self.conv(x)
-        x = self.norm(x)
+        x = self.norm(x, training=training)
         x = self.activation(x)
 
         return x
