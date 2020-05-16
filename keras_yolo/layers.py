@@ -20,3 +20,7 @@ class YoloConvLayer(models.Model):
         x = self.activation(x)
 
         return x
+
+
+class AnchorLayer(models.Model):
+    pass
