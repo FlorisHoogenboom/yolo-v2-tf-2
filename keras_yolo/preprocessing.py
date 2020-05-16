@@ -1,13 +1,13 @@
-import cv2
 import os
-import numpy as np
 import xml.etree.ElementTree as ET
 
-from skimage.transform import resize
+import cv2
+import numpy as np
 from imgaug import augmenters as iaa
 from keras.utils import Sequence
+from skimage.transform import resize
 
-from .model import Yolo
+from keras_yolo.model import Yolo
 
 
 def parse_annotation(ann_dir, img_dir, labels=[]):
@@ -15,7 +15,7 @@ def parse_annotation(ann_dir, img_dir, labels=[]):
     seen_labels = {}
 
     for ann in sorted(os.listdir(ann_dir)):
-        img = {'object':[]}
+        img = {'object': []}
 
         tree = ET.parse(ann_dir + ann)
 
@@ -60,16 +60,27 @@ def parse_annotation(ann_dir, img_dir, labels=[]):
     return all_imgs, seen_labels
 
 
-aug_pipe = iaa.Sequential([
-    iaa.SomeOf((0, 1),
-        [iaa.Invert(0.05, per_channel=True)], random_order=True)
-], random_order=True)
+aug_pipe = iaa.Sequential(
+    [iaa.SomeOf(
+        (0, 1),
+        [iaa.Invert(0.05, per_channel=True)],
+        random_order=True
+    )],
+    random_order=True,
+)
 
 
 class BatchGenerator(Sequence):
-    def __init__(self, images, batch_size, labels,
-                 n_anchors, max_train_boxes=10,
-                 shuffle=True, augment=True):
+    def __init__(
+        self,
+        images,
+        batch_size,
+        labels,
+        n_anchors,
+        max_train_boxes=10,
+        shuffle=True,
+        augment=True,
+    ):
         self.images = images
         self.shuffle = shuffle
         self.augment = augment
@@ -102,15 +113,19 @@ class BatchGenerator(Sequence):
             if i >= self.max_train_boxes:
                 # We cannot store more than MAX_TRAIN_BOXES so simply skip those
                 break
-            if (('xmax' not in obj) or ('xmin' not in obj) or
-                ('ymax' not in obj) or ('ymin' not in obj)):
+            if (
+                ('xmax' not in obj)
+                or ('xmin' not in obj)
+                or ('ymax' not in obj)
+                or ('ymin' not in obj)
+            ):
                 # If polygon we cannot parse for now
                 print(filename)
 
             # Standardize all encodings to 0, 1 so we can easily use them
             # in subsequent calculations.
-            w = ((obj['xmax'] - obj['xmin']) / width)
-            h = ((obj['ymax'] - obj['ymin']) / height)
+            w = (obj['xmax'] - obj['xmin']) / width
+            h = (obj['ymax'] - obj['ymin']) / height
             x_std = (obj['xmin'] / width) + 0.5 * w
             y_std = (obj['ymin'] / height) + 0.5 * h
 
@@ -134,29 +149,45 @@ class BatchGenerator(Sequence):
         input_h, input_w = Yolo.INPUT_SIZE
         grid_h, grid_w = Yolo.GRID_SIZE
 
-        l_bound = idx*self.batch_size
-        r_bound = (idx+1)*self.batch_size
+        l_bound = idx * self.batch_size
+        r_bound = (idx + 1) * self.batch_size
 
         if r_bound > len(self.images):
             r_bound = len(self.images)
             l_bound = r_bound - self.batch_size
 
-        img_input = np.zeros((self.batch_size, input_h, input_w, 3), 'float32')
-        boxes_input = np.zeros((self.batch_size, self.max_train_boxes, 4), 'float32')
-        conf_input = np.zeros((self.batch_size, self.max_train_boxes, 1), 'float32')
-        classes_input = np.zeros((self.batch_size, self.max_train_boxes, len(self.labels)), 'float32')
+        img_input = np.zeros(
+            (self.batch_size, input_h, input_w, 3),
+            'float32'
+        )
+        boxes_input = np.zeros(
+            (self.batch_size, self.max_train_boxes, 4),
+            'float32'
+        )
+        conf_input = np.zeros(
+            (self.batch_size, self.max_train_boxes, 1),
+            'float32'
+        )
+        classes_input = np.zeros(
+            (self.batch_size, self.max_train_boxes, len(self.labels)), 'float32'
+        )
 
         for i, train_instance in enumerate(self.images[l_bound:r_bound]):
-            image, boxes, classes = self.load_image_and_prepare_boxes(**train_instance)
+            image, boxes, classes = (
+                self.load_image_and_prepare_boxes(**train_instance)
+            )
 
             img_input[i] = image
             boxes_input[i] = boxes
             classes_input[i] = classes
 
         y = np.concatenate([boxes_input, conf_input, classes_input], axis=-1)
-        y = np.tile(y[:, None, None, None, ...], [1, grid_h, grid_w, self.n_anchors, 1, 1])
+        y = np.tile(
+            y[:, None, None, None, ...],
+            [1, grid_h, grid_w, self.n_anchors, 1, 1]
+        )
 
-        return img_input[..., [2,1,0]], y
+        return img_input[..., [2, 1, 0]], y
 
     def __len__(self):
-        return int(np.ceil(float(len(self.images))/self.batch_size))
+        return int(np.ceil(float(len(self.images)) / self.batch_size))

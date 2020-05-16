@@ -8,7 +8,7 @@ class WeightReader:
 
     def read_bytes(self, size):
         self.offset = self.offset + size
-        return self.all_weights[self.offset-size:self.offset]
+        return self.all_weights[self.offset - size:self.offset]
 
     def reset(self):
         self.offset = 4
@@ -21,8 +21,8 @@ def non_max_suppression(boxes, probs=None, overlapThresh=0.3):
 
     # if the bounding boxes are integers, convert them to floats -- this
     # is important since we'll be doing a bunch of divisions
-    if boxes.dtype.kind == "i":
-        boxes = boxes.astype("float")
+    if boxes.dtype.kind == 'i':
+        boxes = boxes.astype('float')
 
     # initialize the list of picked indexes
     pick = []
@@ -71,8 +71,9 @@ def non_max_suppression(boxes, probs=None, overlapThresh=0.3):
 
         # delete all indexes from the index list that have overlap greater
         # than the provided overlap threshold
-        idxs = np.delete(idxs, np.concatenate(([last],
-                                               np.where(overlap > overlapThresh)[0])))
+        idxs = np.delete(
+            idxs, np.concatenate(([last], np.where(overlap > overlapThresh)[0]))
+        )
 
     # return only the bounding boxes that were picked
     return boxes[pick]
