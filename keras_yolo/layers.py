@@ -64,7 +64,7 @@ class AnchorLayer(models.Model):
             activation='softmax'
         )
 
-    def compute_predicted_boxes(self, input):
+    def compute_boxes(self, input):
         unaligned_preds = self.boxes_conv(input)
         preds = tf.reshape(
             unaligned_preds,
@@ -128,3 +128,10 @@ class AnchorLayer(models.Model):
         )
 
         return tf.concat([yx_centroids, hw], axis=-1)
+
+    def call(self, inputs, training=None, mask=None):
+        return tf.concat([
+            self.compute_boxes(inputs),
+            self.compute_confidences(inputs),
+            self.compute_classes(inputs)
+        ])

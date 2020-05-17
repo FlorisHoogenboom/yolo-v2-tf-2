@@ -71,7 +71,7 @@ def test_anchor_layer_predicted_boxes():
     )
 
     input = np.random.randn(5, grid_height, grid_width, 1024)
-    output = layer.compute_predicted_boxes(input)
+    output = layer.compute_boxes(input)
 
     assert output.shape == (5, grid_height, grid_width, len(anchors), 4)
 
@@ -87,7 +87,7 @@ def test_anchor_layer_predicted_boxes():
     assert np.all((0 <= diag_diffs) & (diag_diffs <= 2))
 
     input = np.zeros(((5, grid_height, grid_width, 1024)))
-    output = layer.compute_predicted_boxes(input)
+    output = layer.compute_boxes(input)
 
     # With no stimulus, all predicted coordinates should be equal to the base
     # anchor boxes
