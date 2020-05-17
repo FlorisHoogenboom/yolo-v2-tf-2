@@ -34,6 +34,21 @@ def test_anchor_layer_base_anchor_boxes():
     )
     assert np.all(diag_diffs == 1)
 
+    # Check that when moving in the y direction the y coordinate varies
+    # this also checks that the order of the y and x coordinates is proper, i.e.
+    # first the y axis and then the x axis
+    y_diffs = (
+        layer.base_anchor_boxes[1:, ..., 0] -
+        layer.base_anchor_boxes[:-1, ..., 0]
+    )
+    assert np.all(y_diffs == 1)
+
+    x_diffs = (
+        layer.base_anchor_boxes[:, 1:, ..., 1] -
+        layer.base_anchor_boxes[:, :-1, ..., 1]
+    )
+    assert np.all(x_diffs == 1)
+
     # The WH part of every coordinate section should simply match the anchors
     assert np.all(
         layer.base_anchor_boxes[..., 2:] == anchors

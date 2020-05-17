@@ -100,7 +100,7 @@ class AnchorLayer(models.Model):
         ) + 0.5
 
         yx_centroids = tf.concat(
-            [x_centroids[..., None, None], y_centroids[..., None, None]],
+            [y_centroids[..., None, None], x_centroids[..., None, None]],
             axis=-1
         )
         yx_centroids = tf.tile(yx_centroids, [1, 1, len(self.anchors), 1])
