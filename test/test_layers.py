@@ -94,6 +94,78 @@ def test_anchor_layer_predicted_boxes():
     assert np.all((output - layer.base_anchor_boxes) == 0)
 
 
+def test_anchor_layer_confidences():
+    anchors = [
+        [1, 1],
+        [1, 1.5],
+        [1.5, 1]
+    ]
+    batch_size = 5
+    grid_height = 2
+    grid_width = 3
+    layer = layers.AnchorLayer(
+        grid_height=grid_height,
+        grid_width=grid_width,
+        anchors=anchors,
+        n_classes=7
+    )
+
+    input = np.random.randn(batch_size, grid_height, grid_width, 1024)
+    output = layer.compute_confidences(input)
+
+    assert (
+        output.shape == (batch_size, grid_height, grid_width, len(anchors), 1)
+    )
+
+    # Confidences are probabilities
+    assert np.all((0 <= output) & (output <= 1))
+
+    # Each cell should output it's own probability
+    assert (
+        np.unique(output).shape ==
+        (batch_size * grid_height * grid_width * len(anchors),)
+    )
+
+    # When fed with no stimulus all probabilities should resort to 0.5
+    input = np.zeros((batch_size, grid_height, grid_width, 1024))
+    output = layer.compute_confidences(input)
+    assert np.all(output == 0.5)
+
+
+def test_anchor_layer_classes():
+    anchors = [
+        [1, 1],
+        [1, 1.5],
+        [1.5, 1]
+    ]
+    batch_size = 5
+    grid_height = 2
+    grid_width = 3
+    n_classes = 7
+    layer = layers.AnchorLayer(
+        grid_height=grid_height,
+        grid_width=grid_width,
+        anchors=anchors,
+        n_classes=n_classes
+    )
+
+    input = np.random.randn(batch_size, grid_height, grid_width, 1024)
+    output = layer.compute_classes(input)
+
+    assert output.shape == (
+        (batch_size, grid_height, grid_width, len(anchors), n_classes)
+    )
+
+    # The classes should be independent of the exact anchor box
+    assert np.all(
+        (output[..., 0, :] == output[..., 1, :]) &
+        (output[..., 1, :] == output[..., 2, :])
+    )
+
+    # It should be probabilities over the last axis.
+    np.testing.assert_almost_equal(output.numpy().sum(axis=-1), 1.0, decimal=5)
+
+
 def test_anchor_layer_dimensions():
     pass
 

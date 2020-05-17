@@ -86,6 +86,23 @@ class AnchorLayer(models.Model):
 
         return tf.concat([yx, hw], axis=-1)
 
+    def compute_confidences(self, input):
+        unaligned_confs = self.confidence_conv(input)
+        confs = tf.reshape(
+            unaligned_confs,
+            (-1, self.grid_height, self.grid_width, len(self.anchors), 1)
+        )
+
+        return confs
+
+    def compute_classes(self, input):
+        unaligned_classes = self.classes_conv(input)
+        classes = tf.tile(
+            unaligned_classes[:, :, :, None, :],
+            [1, 1, 1, len(self.anchors), 1]
+        )
+        return classes
+
     @property
     def base_anchor_boxes(self):
         h, w = self.grid_height, self.grid_width
