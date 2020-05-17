@@ -24,7 +24,7 @@ def test_anchor_layer_base_anchor_boxes():
         (grid_height, grid_width, len(anchors), 4)
     )
 
-    # The xy coordinates should be centroids (hence end in 0.5)
+    # The yx coordinates should be centroids (hence end in 0.5)
     assert np.all(layer.base_anchor_boxes[..., 0:2] % 1 == 0.5)
 
     # Elements on the diagonals should be increasing stepwise
