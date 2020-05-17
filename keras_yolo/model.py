@@ -2,9 +2,12 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import (
     BatchNormalization, concatenate, Conv2D, Input, Lambda,
-    LeakyReLU, MaxPooling2D, Reshape, Softmax,
+    LeakyReLU, MaxPooling2D
 )
 from tensorflow.keras.models import Model
+
+from keras_yolo import layers
+
 
 
 def tile_outputs(output, max_boxes):
@@ -262,36 +265,12 @@ class Yolo(Model):
         x = BatchNormalization(name='norm_22')(x)
         x = LeakyReLU(alpha=0.1)(x)
 
-        # First we predict 4 coordinates per box to which we will apply the
-        # right transformations in the Yolo.anchor_boxes method
-        boxes = Conv2D(
-            len(self.anchors) * 4,
-            (1, 1),
-            strides=(1, 1),
-            padding='same',
-            name='boxes',
-            activation='linear',
+        output = layers.AnchorLayer(
+            grid_height=Yolo.GRID_SIZE[0],
+            grid_width=Yolo.GRID_SIZE[1],
+            anchors=self.anchors,
+            n_classes=self.n_labels
         )(x)
-        boxes = Reshape((grid_h, grid_w, len(self.anchors), 4))(boxes)
-        boxes = Lambda(self._anchor_boxes)(boxes)
-
-        confidence = Conv2D(
-            len(self.anchors) * 1,
-            (1, 1),
-            strides=(1, 1),
-            padding='same',
-            name='conf',
-            activation='sigmoid',
-        )(x)
-        confidence = Reshape((grid_h, grid_w, len(self.anchors), 1))(confidence)
-
-        classes = Conv2D(
-            self.n_labels, (1, 1), strides=(1, 1), padding='same', name='probas'
-        )(x)
-        classes = Softmax()(classes)
-        tiled_classes = Lambda(self._tile_probas)(classes)
-
-        output = concatenate([boxes, confidence, tiled_classes])
         output = Lambda(lambda x: tile_outputs(x, self.max_boxes))(output)
 
         return input_image, output
