@@ -27,47 +27,14 @@ class Yolo(Model):
 
         input, output = self._get_graph()
 
+        self.anchor_head = layers.AnchorLayer(
+            grid_height=Yolo.GRID_SIZE[0],
+            grid_width=Yolo.GRID_SIZE[1],
+            anchors=self.anchors,
+            n_classes=self.n_labels
+        )
+
         super().__init__(inputs=input, outputs=output)
-
-    def base_anchor_boxes(self):
-        grid_h, grid_w = Yolo.GRID_SIZE
-        anchors_array = np.array(self.anchors).astype('float32')
-
-        cell_x = tf.to_float(
-            tf.reshape(
-                tf.tile(tf.range(grid_w), [grid_h]), (grid_h, grid_w, 1, 1)
-            )
-        )
-        cell_y = tf.transpose(cell_x, (1, 0, 2, 3))
-
-        # The resulting grid + 0.5 are the center points of the actual cells
-        xy_grid = (
-            tf.tile(
-                tf.concat([cell_x, cell_y], -1), [1, 1, len(self.anchors), 1]
-            ) + 0.5
-        )
-
-        wh_grid = tf.tile(anchors_array[None, None, :], [grid_h, grid_w, 1, 1])
-
-        return tf.concat([xy_grid, wh_grid], axis=-1)
-
-    def _anchor_boxes(self, input_tensor):
-        base_boxes = self.base_anchor_boxes()
-        xy_base = base_boxes[..., 0:2]
-        wh_base = base_boxes[..., 2:4]
-
-        # Substract 1/2 from the result of applying sigmoid to get a
-        # value in the range (-0.5, 0.5). Hence, they are fluctuating around
-        # the grid centers
-        xy = xy_base + (tf.sigmoid(input_tensor[..., 0:2]) - 0.5)
-
-        # TODO: Solve this.... this returns inf...
-        wh = tf.clip_by_value(wh_base * tf.exp(input_tensor[..., 2:4]), 0, 130)
-
-        return tf.concat([xy, wh], axis=-1)
-
-    def _tile_probas(self, x):
-        return tf.tile(tf.expand_dims(x, 3), [1, 1, 1, len(self.anchors), 1])
 
     def _get_graph(self):
         image_h, image_w = Yolo.INPUT_SIZE
@@ -265,18 +232,13 @@ class Yolo(Model):
         x = BatchNormalization(name='norm_22')(x)
         x = LeakyReLU(alpha=0.1)(x)
 
-        output = layers.AnchorLayer(
-            grid_height=Yolo.GRID_SIZE[0],
-            grid_width=Yolo.GRID_SIZE[1],
-            anchors=self.anchors,
-            n_classes=self.n_labels
-        )(x)
+        output = self.anchor_head(x)
         output = Lambda(lambda x: tile_outputs(x, self.max_boxes))(output)
 
         return input_image, output
 
     def _warmup_loss(self, y_true, y_pred):
-        base_anchor_boxes = self.base_anchor_boxes()
+        base_anchor_boxes = self.anchor_head.base_anchor_boxes
 
         xy_true = base_anchor_boxes[..., 0:2]
         wh_true = base_anchor_boxes[..., 2:4]
@@ -320,7 +282,7 @@ class Yolo(Model):
 
     def pad_base_boxes_for_loss(self):
         base_boxes = tf.tile(
-            tf.expand_dims(self.base_anchor_boxes(), axis=-2),
+            tf.expand_dims(self.anchor_head.base_anchor_boxes, axis=-2),
             [1, 1, 1, self.max_boxes, 1],
         )
         return base_boxes
@@ -340,7 +302,9 @@ class Yolo(Model):
             Tensor: A boolean tensor of shape (None, GRID_H, GRID_W, N_ANCHORS,
                 MAX_TRAIN_BOXES)
         """
-        grid_h, grid_w = Yolo.GRID_SIZE
+        grid_h, grid_w = (
+            self.anchor_head.grid_height, self.anchor_head.grid_width
+        )
         if threshold is None:
             max_iou = tf.tile(
                 tf.reduce_max(iou, axis=[1, 2, 3], keepdims=True),
