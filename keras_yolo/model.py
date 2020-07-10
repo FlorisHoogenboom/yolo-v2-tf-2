@@ -8,24 +8,6 @@ from tensorflow.keras.models import Model
 from keras_yolo import layers
 
 
-def flatten_anchor_boxes(
-        anchor_output,
-        anchor_layer,
-        include_conf=True,
-        include_classes=True
-):
-    n_grid_cells = anchor_layer.grid_height * anchor_layer.grid_width
-    n_anchors = anchor_layer.n_anchors
-    n_classes = anchor_layer.n_classes * include_classes
-    n_conf = 1 * include_conf
-    desired_shape = (-1, n_grid_cells * n_anchors, 4 + n_conf + n_classes)
-
-    return tf.reshape(
-        anchor_output,
-        shape=desired_shape
-    )
-
-
 class Yolo(object):
     INPUT_SIZE = (416, 416)
     GRID_SIZE = (13, 13)

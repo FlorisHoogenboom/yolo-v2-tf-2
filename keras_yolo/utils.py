@@ -1,4 +1,40 @@
 import numpy as np
+import tensorflow as tf
+
+
+def flatten_anchor_boxes(
+        anchor_output,
+        anchor_layer,
+        include_conf=True,
+        include_classes=True
+):
+    """
+    Transforms a tensor as returned by ``keras_yolo.layers.AnchorLayer`` into a
+    tensor of the format ``(batch_size, n_boxes, n_box_params)``.
+
+    Args:
+        anchor_output (tf.Tensor): Tensor as returned by
+            ``keras_yolo.layer.AnchorLayer``
+        anchor_layer (keras_yolo.layer.AnchorLayer): The layer that returned
+            the tensor passed as first argument.
+        include_conf (bool): Whether the confidence parameter is included in
+            the ``anchor_output`` parameter.
+        include_classes (bool): Whether the classes parameters are included in
+            the ``anchor_output`` parameter.
+
+    Returns:
+        tf.Tensor: A tensor of the shape ``(batch_size, n_boxes, n_box_params)``
+    """
+    n_grid_cells = anchor_layer.grid_height * anchor_layer.grid_width
+    n_anchors = anchor_layer.n_anchors
+    n_classes = anchor_layer.n_classes * include_classes
+    n_conf = 1 * include_conf
+    desired_shape = (-1, n_grid_cells * n_anchors, 4 + n_conf + n_classes)
+
+    return tf.reshape(
+        anchor_output,
+        shape=desired_shape
+    )
 
 
 class WeightReader:
