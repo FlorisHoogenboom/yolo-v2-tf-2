@@ -39,3 +39,28 @@ def compute_iou(pred_coords, true_coords):
     div_result = tf.truediv(intersection_area, union_area + 0.0001)
 
     return div_result
+
+
+def compute_best_iou_mask(iou):
+    """
+    Computes a mask that assigns each true box to a best matching predicted box.
+
+    This method uses a random pertubabition to resolve ties. This means that
+    eacht truth box will get assigned only one predicted box.
+
+    Args:
+        iou (tf.Tensor): A tensor as returned by ``compute_iou``.
+
+    Returns:
+        tf.Tensor: A boolean tensor of the same format as the input tensor.
+    """
+    epsilon = 0.00001
+    tie_broken_iou = iou + tf.random.normal(iou.shape, stddev=epsilon)
+
+    largest_iou = tf.reduce_max(
+        tie_broken_iou,
+        axis=1,
+        keepdims=True
+    )
+
+    return (tie_broken_iou == largest_iou) & (iou > 0)
