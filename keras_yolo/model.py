@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import (
     BatchNormalization, concatenate, Conv2D, Input, Lambda,
@@ -9,37 +8,39 @@ from tensorflow.keras.models import Model
 from keras_yolo import layers
 
 
+def flatten_anchor_boxes(
+        anchor_output,
+        anchor_layer,
+        include_conf=True,
+        include_classes=True
+):
+    n_grid_cells = anchor_layer.grid_height * anchor_layer.grid_width
+    n_anchors = anchor_layer.n_anchors
+    n_classes = anchor_layer.n_classes * include_classes
+    n_conf = 1 * include_conf
+    desired_shape = (-1, n_grid_cells * n_anchors, 4 + n_conf + n_classes)
 
-def tile_outputs(output, max_boxes):
-    expanded = tf.expand_dims(output, 4)
-    return tf.tile(expanded, [1, 1, 1, 1, max_boxes, 1])
+    return tf.reshape(
+        anchor_output,
+        shape=desired_shape
+    )
 
 
-class Yolo(Model):
+class Yolo(object):
     INPUT_SIZE = (416, 416)
     GRID_SIZE = (13, 13)
 
-    def __init__(self, n_labels, anchors=None, max_boxes=10):
+    def __init__(self, n_labels, anchors):
         self.n_labels = n_labels
         self.anchors = anchors
-        self.max_boxes = max_boxes
         self.warmup_rounds = 10
 
-        input, output = self._get_graph()
-
-        self.anchor_head = layers.AnchorLayer(
-            grid_height=Yolo.GRID_SIZE[0],
-            grid_width=Yolo.GRID_SIZE[1],
-            anchors=self.anchors,
-            n_classes=self.n_labels
-        )
-
-        super().__init__(inputs=input, outputs=output)
+        self.inputs, self.outputs, self.anchor_heads = self._get_graph()
+        self.model = Model(inputs=self.inputs, outputs=self.outputs)
 
     def _get_graph(self):
         image_h, image_w = Yolo.INPUT_SIZE
         grid_h, grid_w = Yolo.GRID_SIZE
-
         input_image = Input(shape=(image_h, image_w, 3))
 
         # Layer 1
@@ -218,7 +219,7 @@ class Yolo(Model):
         )(skip_connection)
         skip_connection = BatchNormalization(name='norm_21')(skip_connection)
         skip_connection = LeakyReLU(alpha=0.1)(skip_connection)
-        skip_connection = Lambda(lambda x: tf.space_to_depth(x, block_size=2))(
+        skip_connection = Lambda(lambda x: tf.nn.space_to_depth(x, block_size=2))(
             skip_connection
         )
 
@@ -232,157 +233,14 @@ class Yolo(Model):
         x = BatchNormalization(name='norm_22')(x)
         x = LeakyReLU(alpha=0.1)(x)
 
-        output = self.anchor_head(x)
-        output = Lambda(lambda x: tile_outputs(x, self.max_boxes))(output)
-
-        return input_image, output
-
-    def _warmup_loss(self, y_true, y_pred):
-        base_anchor_boxes = self.anchor_head.base_anchor_boxes
-
-        xy_true = base_anchor_boxes[..., 0:2]
-        wh_true = base_anchor_boxes[..., 2:4]
-
-        xy_pred = y_pred[..., 0, 0:2]
-        wh_pred = y_pred[..., 0, 2:4] + 0.0000001
-
-        wh_loss = tf.reduce_sum(
-            tf.squared_difference(tf.sqrt(wh_pred), tf.sqrt(wh_true))
-        )
-        xy_loss = tf.reduce_sum(tf.squared_difference(xy_true, xy_pred))
-
-        return wh_loss + xy_loss
-
-    @staticmethod
-    def compute_iou(y_true, y_pred):
-        xy_true = y_true[..., 0:2]
-        wh_true = y_true[..., 2:4]
-
-        xy_pred = y_pred[..., 0:2]
-        wh_pred = y_pred[..., 2:4]
-
-        xy_tl_true = xy_true - 0.5 * wh_true
-        xy_br_true = xy_true + 0.5 * wh_true
-
-        xy_tl_pred = xy_pred - 0.5 * wh_pred
-        xy_br_pred = xy_pred + 0.5 * wh_pred
-
-        # IOU computation
-        max_xy_tl = tf.maximum(xy_tl_true, xy_tl_pred)
-        min_xy_br = tf.minimum(xy_br_true, xy_br_pred)
-
-        intersect_wh = tf.maximum(min_xy_br - max_xy_tl, 0)
-        intersection_area = intersect_wh[..., 0] * intersect_wh[..., 1]
-
-        union_area_pred = wh_pred[..., 0] * wh_pred[..., 1]
-        union_area_truth = wh_true[..., 0] * wh_true[..., 1]
-        union_area = union_area_pred + union_area_truth - intersection_area
-
-        return tf.truediv(intersection_area, union_area)
-
-    def pad_base_boxes_for_loss(self):
-        base_boxes = tf.tile(
-            tf.expand_dims(self.anchor_head.base_anchor_boxes, axis=-2),
-            [1, 1, 1, self.max_boxes, 1],
-        )
-        return base_boxes
-
-    def build_iou_mask(self, iou, threshold=None):
-        """
-        Computes the IOU mask to use for training. If no threshold is provided
-        the best matching anchor of all anchors is returned. If a threshold is
-        given all values with an iou above that threshold are returned
-
-        Args:
-            iou: Tensor of shape (None, GRID_H, GRID_W,
-                N_ANCHORS, MAX_TRAIN_BOXES)
-            threshold: (None or Float) If given, the IOU threshold to use for
-                the mask
-        Returns:
-            Tensor: A boolean tensor of shape (None, GRID_H, GRID_W, N_ANCHORS,
-                MAX_TRAIN_BOXES)
-        """
-        grid_h, grid_w = (
-            self.anchor_head.grid_height, self.anchor_head.grid_width
-        )
-        if threshold is None:
-            max_iou = tf.tile(
-                tf.reduce_max(iou, axis=[1, 2, 3], keepdims=True),
-                [1, grid_h, grid_w, len(self.anchors), 1],
-            )
-
-            return (iou >= max_iou) & (max_iou > 0)
-        else:
-            return (iou > threshold) & (iou > 0)
-
-    def _loss(self, y_true, y_pred):
-        xy_true = y_true[..., 0:2]
-        wh_true = y_true[..., 2:4]
-
-        xy_pred = y_pred[..., 0:2]
-        wh_pred = y_pred[..., 2:4]
-
-        conf_pred = y_pred[..., 4]
-
-        # Compute IOUs to match predicted boxes with actual boxes
-        base_boxes = self.pad_base_boxes_for_loss()
-        anchors_iou = Yolo.compute_iou(y_true, base_boxes)
-        predictions_iou = Yolo.compute_iou(y_true, y_pred)
-        # We compute a tie breaker that assigns the best box in case of ties
-        tie_breaker = -0.0001 * tf.norm(xy_true - base_boxes[..., 0:2], axis=-1)
-
-        # Compute masks we will use to determine which coordinates
-        # to adapt and apply these masks to get matching records
-        anchors_mask = self.build_iou_mask(anchors_iou + tie_breaker)
-        predictions_mask = self.build_iou_mask(predictions_iou, threshold=0.6)
-
-        xy_true_masked = tf.boolean_mask(xy_true, anchors_mask)
-        wh_true_masked = tf.boolean_mask(wh_true, anchors_mask)
-
-        xy_pred_masked = tf.boolean_mask(xy_pred, anchors_mask)
-        wh_pred_masked = tf.boolean_mask(wh_pred, anchors_mask)
-
-        # Compute the XY and WH loss
-        xy_loss = tf.reduce_mean(
-            tf.squared_difference(xy_true_masked, xy_pred_masked)
-        )
-        wh_loss = tf.reduce_mean(
-            tf.squared_difference(
-                tf.sqrt(wh_true_masked), tf.sqrt(wh_pred_masked)
-            )
-        )
-        coord_loss = xy_loss + wh_loss
-        coord_loss = 5 * coord_loss
-
-        # Compute the object confidence loss
-        conf_pred_masked = tf.boolean_mask(
-            conf_pred, anchors_mask | predictions_mask
-        )
-        true_confs_masked = tf.boolean_mask(
-            predictions_iou, anchors_mask | predictions_mask
-        )
-        obj_conf_loss = tf.reduce_mean(
-            tf.squared_difference(true_confs_masked, conf_pred_masked)
+        # Initialize the definitive anchor head.
+        anchor_head = layers.AnchorLayer(
+            grid_height=grid_h,
+            grid_width=grid_w,
+            anchors=self.anchors,
+            n_classes=self.n_labels
         )
 
-        # compute the no object confidence loss
-        no_conf_pred_masked = tf.boolean_mask(
-            conf_pred, ~(anchors_mask | predictions_mask)
-        )
-        no_obj_conf_loss = tf.reduce_mean(
-            tf.squared_difference(0.0, no_conf_pred_masked)
-        )
+        anchor_output = anchor_head(x)
 
-        return coord_loss + obj_conf_loss + 0.5 * no_obj_conf_loss
-
-    def loss(self, y_true, y_pred):
-        seen = tf.Variable(0.0)
-        seen = tf.assign_add(seen, 1.0)
-
-        loss = tf.cond(
-            tf.less(seen, self.warmup_rounds),
-            lambda: self._warmup_loss(y_true, y_pred),
-            lambda: self._loss(y_true, y_pred),
-        )
-
-        return loss
+        return input_image, [anchor_output], [anchor_head]
