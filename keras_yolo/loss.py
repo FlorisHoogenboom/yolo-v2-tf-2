@@ -136,7 +136,8 @@ def warmup_loss(y_pred, network):
     )
 
     wh_warmup_loss = tf.reduce_sum(
-        tf.square(tf.sqrt(base_boxes[..., 0:2]) - tf.sqrt(predicted_boxes[..., 0:2]))
+        tf.square(tf.sqrt(base_boxes[..., 0:2]) -
+                  tf.sqrt(predicted_boxes[..., 0:2]))
     )
 
     warmup_loss = xy_warmup_loss + wh_warmup_loss
@@ -186,7 +187,8 @@ def loss(y_pred, y_true, network):
     wh_loss = tf.reduce_mean(
         tf.boolean_mask(
             tf.square(
-                tf.sqrt(predicted_boxes[:, :, None, 2:4]) - tf.sqrt(y_true[:, None, :, 2:4])
+                tf.sqrt(predicted_boxes[:, :, None, 2:4]) -
+                tf.sqrt(y_true[:, None, :, 2:4])
             ),
             base_boxes_mask
         )
