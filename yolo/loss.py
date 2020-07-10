@@ -73,48 +73,6 @@ def compute_best_iou_mask(iou):
     return (tie_broken_iou == largest_iou) & (iou > 0)
 
 
-def get_base_and_predicted_boxes(network_output, network):
-    """
-
-    Args:
-        network_output (list of tf.Tensor): A list of output tensors of the
-            anchor heads in the Yolo network.
-        network (keras_yolo.model.Yolo): An instance of the Yolo network
-
-    Returns:
-        tf.Tensor: A tensor with shape
-            ``(batch_size, n_total_boxes, 4 + 1 + n_classes)``
-    """
-    if type(network_output) is not list:
-        network_output = [network_output]
-
-    predicted_boxes = []
-    base_boxes = []
-    for anchor_output, anchor_head in zip(network_output, network.anchor_heads):
-        predicted_boxes.append(
-            utils.flatten_anchor_boxes(
-                anchor_output,
-                anchor_head,
-                include_conf=True,
-                include_classes=True
-            )
-        )
-
-        base_boxes.append(
-            utils.flatten_anchor_boxes(
-                anchor_head.base_anchor_boxes,
-                anchor_head,
-                include_conf=False,
-                include_classes=False
-            )
-        )
-
-    predicted_boxes = tf.concat(predicted_boxes, axis=1)
-    base_boxes = tf.concat(base_boxes, axis=1)
-
-    return predicted_boxes, base_boxes
-
-
 def warmup_loss(y_pred, network):
     """
     Loss to warmup the network for training. This loss function pushes the
@@ -129,7 +87,9 @@ def warmup_loss(y_pred, network):
     Returns:
         tf.Tensor: Scalar tensor representing the total loss.
     """
-    predicted_boxes, base_boxes = get_base_and_predicted_boxes(y_pred, network)
+    predicted_boxes, base_boxes = (
+        utils.get_base_and_predicted_boxes(y_pred, network)
+    )
 
     xy_warmup_loss = tf.reduce_sum(
         tf.square(base_boxes[..., 0:2] - predicted_boxes[..., 0:2])
