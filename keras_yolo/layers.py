@@ -82,7 +82,7 @@ class AnchorLayer(models.Model):
         # Clip the WH values at an arbitrary boundary such that we prevent
         # them from exploding to infinity during training
         # TODO: Fix the arbitrary clipping bound
-        hw = tf.clip_by_value(hw_base * tf.exp(preds[..., 2:4]), 0, 130)
+        hw = hw_base * tf.clip_by_value(tf.exp(preds[..., 2:4]), 0.00001, 130)
 
         return tf.concat([yx, hw], axis=-1)
 
@@ -134,4 +134,8 @@ class AnchorLayer(models.Model):
             self.compute_boxes(inputs),
             self.compute_confidences(inputs),
             self.compute_classes(inputs)
-        ])
+        ], axis=-1)
+
+    @property
+    def n_anchors(self):
+        return len(self.anchors)
