@@ -52,3 +52,16 @@ def test_flatten_anchor_boxes():
         grid_boxes[0, 0, 0, 0, 0:4]
     )
 
+
+def test_boxes_to_coords():
+    boxes = np.array([
+        [1.0, 2.0, 2.0, 1.0]
+    ])
+
+    coords = utils.boxes_to_coords(boxes)
+    expected_coords = np.array([
+        [0.0, 1.5, 2.0, 2.5]
+    ])
+
+    np.testing.assert_array_equal(coords, expected_coords)
+

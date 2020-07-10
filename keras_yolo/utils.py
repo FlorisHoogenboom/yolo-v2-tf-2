@@ -37,6 +37,25 @@ def flatten_anchor_boxes(
     )
 
 
+def boxes_to_coords(boxes):
+    """
+    Converts a tensor of boxes encoded by centerpoint and width/height to a
+    tensor of boxes encoded in coordinates.
+
+    Args:
+        boxes (tf.Tensor): Tensor with the first four entries of the last
+            dimension representing the centerpoint and height/width of the box.
+
+    Returns:
+        tf.Tensor: Tensor of the same shape as the input, but with the entries
+            of the last dimention representing box coordinates.
+    """
+    top_left_yx = boxes[..., 0:2] - 0.5 * boxes[..., 2:4]
+    bottom_right_yx = boxes[..., 0:2] + 0.5 * boxes[..., 2:4]
+
+    return tf.concat([top_left_yx, bottom_right_yx], axis=-1)
+
+
 class WeightReader:
     def __init__(self, weight_file):
         self.offset = 4
