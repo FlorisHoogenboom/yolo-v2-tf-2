@@ -1,5 +1,7 @@
 import tensorflow as tf
 
+from keras_yolo import utils
+
 
 def compute_iou(pred_coords, true_coords):
     """
@@ -64,3 +66,45 @@ def compute_best_iou_mask(iou):
     )
 
     return (tie_broken_iou == largest_iou) & (iou > 0)
+
+
+def get_base_and_predicted_boxes(network_output, network):
+    """
+
+    Args:
+        network_output (list of tf.Tensor): A list of output tensors of the
+            anchor heads in the Yolo network.
+        network (keras_yolo.model.Yolo): An instance of the Yolo network
+
+    Returns:
+        tf.Tensor: A tensor with shape
+            ``(batch_size, n_total_boxes, 4 + 1 + n_classes)``
+    """
+    if type(network_output) is not list:
+        network_output = [network_output]
+
+    predicted_boxes = []
+    base_boxes = []
+    for anchor_output, anchor_head in zip(network_output, network.anchor_heads):
+        predicted_boxes.append(
+            utils.flatten_anchor_boxes(
+                anchor_output,
+                anchor_head,
+                include_conf=True,
+                include_classes=True
+            )
+        )
+
+        base_boxes.append(
+            utils.flatten_anchor_boxes(
+                anchor_head.base_anchor_boxes,
+                anchor_head,
+                include_conf=False,
+                include_classes=False
+            )
+        )
+
+    predicted_boxes = tf.concat(predicted_boxes, axis=1)
+    base_boxes = tf.concat(base_boxes, axis=1)
+
+    return predicted_boxes, base_boxes
