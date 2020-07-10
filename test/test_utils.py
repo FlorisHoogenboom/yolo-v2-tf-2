@@ -64,4 +64,3 @@ def test_boxes_to_coords():
     ])
 
     np.testing.assert_array_equal(coords, expected_coords)
-
