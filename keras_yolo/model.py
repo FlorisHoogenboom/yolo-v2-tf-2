@@ -201,8 +201,10 @@ class Yolo(object):
         )(skip_connection)
         skip_connection = BatchNormalization(name='norm_21')(skip_connection)
         skip_connection = LeakyReLU(alpha=0.1)(skip_connection)
-        skip_connection = Lambda(lambda x: tf.nn.space_to_depth(x, block_size=2))(
-            skip_connection
+        skip_connection = (
+            Lambda(lambda x: tf.nn.space_to_depth(x, block_size=2))(
+                skip_connection
+            )
         )
 
         x = concatenate([skip_connection, x])

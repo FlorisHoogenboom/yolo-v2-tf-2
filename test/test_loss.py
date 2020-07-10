@@ -2,6 +2,7 @@ import numpy as np
 
 from keras_yolo import loss
 
+
 def test_compute_iou():
     predicted_boxes = np.array([[
         [1., 1., 3., 3.],
