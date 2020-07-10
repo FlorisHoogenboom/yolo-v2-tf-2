@@ -3,6 +3,11 @@ import tensorflow as tf
 from keras_yolo import utils
 
 
+IOU_THRESHOLD = 0.6
+COORD_LOSS_WEIGHT = 5
+NEG_CONF_LOSS_WEIGHT = 0.5
+
+
 def compute_iou(pred_coords, true_coords):
     """
     Calculates the IOU between all boxes in two collections.
@@ -108,3 +113,106 @@ def get_base_and_predicted_boxes(network_output, network):
     base_boxes = tf.concat(base_boxes, axis=1)
 
     return predicted_boxes, base_boxes
+
+
+def warmup_loss(y_pred, network):
+    """
+    Loss to warmup the network for training. This loss function pushes the
+    bounding boxes to their positions and dimensions based on the anchors.
+
+    Args:
+        y_pred (tf.Tensor or list of tf.Tensor): The output(s) of the Yolo
+            network.
+        network (keras_yolo.model.Yolo): Instance of the network that produced
+            ``y_pred``.
+
+    Returns:
+        tf.Tensor: Scalar tensor representing the total loss.
+    """
+    predicted_boxes, base_boxes = get_base_and_predicted_boxes(y_pred, network)
+
+    xy_warmup_loss = tf.reduce_sum(
+        tf.square(base_boxes[..., 0:2] - predicted_boxes[..., 0:2])
+    )
+
+    wh_warmup_loss = tf.reduce_sum(
+        tf.square(tf.sqrt(base_boxes[..., 0:2]) - tf.sqrt(predicted_boxes[..., 0:2]))
+    )
+
+    warmup_loss = xy_warmup_loss + wh_warmup_loss
+
+    return warmup_loss
+
+
+def loss(y_pred, y_true, network):
+    """
+
+    Args:
+        y_pred (tf.Tensor or list of tf.Tensor): The output(s) of the Yolo
+            network.
+        y_true (tf.Tensor): A tensor of shape
+            ``(batch_size, max_train_boxes, 4)``
+        network (keras_yolo.model.Yolo): Instance of the network that produced
+            ``y_pred``.
+
+    Returns:
+        tf.Tensor: Scalar tensor representing the total loss.
+    """
+    predicted_boxes, base_boxes = get_base_and_predicted_boxes(y_pred, network)
+
+    # Convert all boxes to actual coordinates
+    pred_coords = utils.boxes_to_coords(predicted_boxes)
+    base_coords = utils.boxes_to_coords(base_boxes)
+    true_coords = utils.boxes_to_coords(y_true)
+
+    # Compute the IOU masks
+    base_boxes_iou = compute_iou(base_coords, true_coords)
+    pred_boxes_iou = compute_iou(pred_coords, true_coords)
+
+    # Derive the loss masks from the IOU masks
+    base_boxes_mask = compute_best_iou_mask(base_boxes_iou)
+    conf_mask = base_boxes_mask | (pred_boxes_iou > IOU_THRESHOLD)
+
+    # Compute the actual loss components
+    xy_loss = tf.reduce_mean(
+        tf.boolean_mask(
+            tf.square(
+                predicted_boxes[:, :, None, 0:2] - y_true[:, None, :, 0:2]
+            ),
+            base_boxes_mask
+        )
+    )
+
+    wh_loss = tf.reduce_mean(
+        tf.boolean_mask(
+            tf.square(
+                tf.sqrt(predicted_boxes[:, :, None, 2:4]) - tf.sqrt(y_true[:, None, :, 2:4])
+            ),
+            base_boxes_mask
+        )
+    )
+
+    positive_conf_loss = tf.reduce_mean(
+        tf.boolean_mask(
+            tf.square(
+                predicted_boxes[..., 4, None] - pred_boxes_iou
+            ),
+            conf_mask
+        )
+    )
+
+    negative_conf_loss = tf.reduce_mean(
+        tf.boolean_mask(
+            tf.square(
+                predicted_boxes[..., 4, None]
+            ),
+            ~(tf.reduce_any(conf_mask, axis=-1, keepdims=True))
+        )
+    )
+
+    return (
+            COORD_LOSS_WEIGHT * (xy_loss + wh_loss) +
+            positive_conf_loss +
+            NEG_CONF_LOSS_WEIGHT * negative_conf_loss
+            # TODO: Class loss should still be implemented.
+    )
