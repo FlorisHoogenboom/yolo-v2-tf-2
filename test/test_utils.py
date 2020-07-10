@@ -1,7 +1,7 @@
 import numpy as np
 
-from keras_yolo import utils
-from keras_yolo import layers
+from yolo import utils
+from yolo import layers
 
 
 def test_flatten_anchor_boxes():

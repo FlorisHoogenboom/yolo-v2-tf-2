@@ -5,7 +5,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.models import Model
 
-from keras_yolo import layers
+from yolo import layers
 
 
 class Yolo(object):

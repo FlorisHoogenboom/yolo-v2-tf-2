@@ -1,6 +1,6 @@
 import numpy as np
 
-from keras_yolo import layers
+from yolo import layers
 
 
 def test_anchor_layer_base_anchor_boxes():

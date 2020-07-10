@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from keras_yolo import utils
+from yolo import utils
 
 
 IOU_THRESHOLD = 0.6

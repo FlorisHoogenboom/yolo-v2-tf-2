@@ -1,6 +1,6 @@
 import numpy as np
 
-from keras_yolo import loss
+from yolo import loss
 
 
 def test_compute_iou():
