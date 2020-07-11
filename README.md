@@ -12,4 +12,4 @@ When initialized the network is ofcourse untrained. Weights trained on Pascal VO
 ## Questions you'll probably have after browsing this repo
 - __Why v2 and not v3?__: Yolo-v2 is relatively more simple than yolo-v3 since it only has a single anchor/detector head. However, this implementation is done in such a way that one could easilly add multiple anchor heads in the `yolo.model.Yolo` implementation (see [here](yolo/model.py#L221))
 - __Is this performance wise comparable to the original Yolo implementation__: No. Don't use this if you care about quality. The goal of this repo is understanding.
--- __Which backbones are available__: Currently the darknet backbone is hardcoded. I am working on adding support for other backbones.
+- __Which backbones are available__: Currently the darknet backbone is hardcoded. I am working on adding support for other backbones.
