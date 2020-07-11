@@ -1,7 +1,6 @@
 import numpy as np
 
-from yolo import utils
-from yolo import layers
+from yolo import layers, utils
 
 
 def test_flatten_anchor_boxes():

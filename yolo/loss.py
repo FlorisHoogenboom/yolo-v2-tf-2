@@ -119,7 +119,9 @@ def loss(y_pred, y_true, network):
     Returns:
         tf.Tensor: Scalar tensor representing the total loss.
     """
-    predicted_boxes, base_boxes = get_base_and_predicted_boxes(y_pred, network)
+    predicted_boxes, base_boxes = (
+        utils.get_base_and_predicted_boxes(y_pred, network)
+    )
 
     # Convert all boxes to actual coordinates
     pred_coords = utils.boxes_to_coords(predicted_boxes)
