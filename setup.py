@@ -3,9 +3,7 @@ from setuptools import find_packages, setup
 dependencies = [
     'tensorflow==2.2.0',
     'numpy==1.18.4',
-    'lxml==4.2.6',
-    'scikit-image==0.16.2',
-    'imgaug==0.2.9'
+    'tensorflow-datasets==3.1.0'
 ]
 
 test_dependencies = [
