@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 dependencies = [
-    'tensorflow==2.2.0',
+    'tensorflow==2.2.1',
     'numpy==1.18.4',
     'tensorflow-datasets==3.1.0'
 ]
